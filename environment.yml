@@ -1,0 +1,53 @@
+# =============================================================================
+# GMQ 580 — Séance 06 : environnement conda
+#
+# Création  : conda env create -f environment.yml
+# Activation : conda activate gmq580
+# Mise à jour : conda env update -f environment.yml --prune
+# =============================================================================
+
+name: gmq580
+
+channels:
+  - conda-forge   # source principale pour les paquets géospatiaux
+  - defaults
+
+dependencies:
+  - python=3.11
+
+  # --- Données vecteur ---
+  - geopandas>=1.0
+  - pyogrio>=0.7
+  - shapely>=2.0
+
+  # --- Données raster ---
+  - rasterio>=1.3
+  - xarray>=2024.1
+
+  # --- Calcul numérique ---
+  - numpy>=1.26
+  - pandas>=2.1
+
+  # --- Cartographie statique ---
+  - matplotlib>=3.8
+  - mapclassify>=2.6
+  - contextily>=1.4
+  - cartopy>=0.22
+
+  # --- Cartes interactives ---
+  - folium>=0.17
+  - plotly>=5.18
+
+  # --- Tableaux de bord ---
+  - dash>=2.16
+  - panel>=1.4
+  - hvplot>=0.9
+  - holoviews>=1.18
+  - geoviews>=1.10      # requis par hvplot pour geo=True et les fonds de carte tuiles
+
+  # --- Rapport Word ---
+  - python-docx>=1.0
+
+  # --- Utilitaires ---
+  - gdown>=5.0
+  - pyyaml>=6.0

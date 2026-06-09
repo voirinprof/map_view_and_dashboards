@@ -1,0 +1,35 @@
+# =============================================================================
+# .gitignore — GMQ 580 Séance 06
+# Les données sont volumineuses et téléchargeables via download_data.py
+# Les sorties sont regénérables en exécutant les scripts
+# =============================================================================
+
+# --- Données source (télécharger via download_data.py) ---
+data/vector/*.gpkg
+data/vector/*.csv
+data/raster/*.tif
+data/raster/*.tiff
+
+# --- Fichiers générés (cartes, rapports) ---
+output/*
+!output/.gitkeep
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# --- Environnements virtuels ---
+.env
+.venv/
+venv/
+env/
+
+# --- IDE ---
+.idea/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+.vscode/settings.json
