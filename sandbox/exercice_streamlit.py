@@ -77,6 +77,12 @@ gdf_arr, df_occ = load_data()
 # =============================================================================
 
 # --- votre code ici ---
+# définition du titre de la page, du titre principal et de l'en-tête de la sidebar.
+st.set_page_config(page_title="Exploration des occupants", layout="wide")
+# le titre principal de l'application doit être "Exploration des occupants — Sherbrooke"
+st.title("Exploration des occupants — Sherbrooke")
+# l'en-tête de la sidebar doit être "Filtres"
+st.sidebar.header("Filtres")
 
 
 # =============================================================================
@@ -94,6 +100,27 @@ gdf_arr, df_occ = load_data()
 # selected_arr   = ...
 # selected_types = ...
 
+# pour définir un filtre pour les arrondissements, on utilise un selectbox avec comme options "Tous" + la liste 
+# des arrondissements uniques présents dans le DataFrame.
+
+# on veut les valeurs uniques de la colonne "arrondissement", triées par ordre alphabétique, 
+# et on ajoute "Tous" au début de la liste pour permettre de désactiver le filtre.
+arr_options = ["Tous"] + sorted(df_occ["arrondissement"].unique().tolist())
+selected_arr = st.sidebar.selectbox("Arrondissement", arr_options)
+
+# pour le filtre des types d'établissement, on utilise un multiselect avec comme options la liste 
+# des types d'établissement uniques présents dans le DataFrame.
+
+# on veut les valeurs uniques de la colonne "type_etablissement", triées par ordre alphabétique,
+# et on ignore les valeurs manquantes (dropna) pour éviter d'avoir une option "NaN" dans le multiselect.
+type_options = sorted(df_occ["type_etablissement"].dropna().unique().tolist())
+
+selected_types = st.sidebar.multiselect(
+    "Types d'établissement",
+    options=type_options,
+    default=[],   # vide = tous les types affichés
+)
+
 
 # =============================================================================
 # TODO 3 — Filtrage du DataFrame
@@ -105,7 +132,20 @@ gdf_arr, df_occ = load_data()
 # Indice : utiliser des conditions if/else avec .copy() et .isin()
 # =============================================================================
 
-df_filtered = df_occ.copy()   # ← remplacer par la logique de filtrage
+#df_filtered = df_occ.copy()   # ← remplacer par la logique de filtrage
+
+# faison une copie du DataFrame original pour ne pas modifier les données brutes.
+df_filtered = df_occ.copy()
+
+# ensuite on applique les filtres un par un.
+
+# Filtre par arrondissement — "Tous" désactive le filtre
+if selected_arr != "Tous":
+    df_filtered = df_filtered[df_filtered["arrondissement"] == selected_arr]
+
+# Filtre par type — liste vide désactive le filtre
+if selected_types:
+    df_filtered = df_filtered[df_filtered["type_etablissement"].isin(selected_types)]
 
 
 # =============================================================================
@@ -121,6 +161,12 @@ df_filtered = df_occ.copy()   # ← remplacer par la logique de filtrage
 
 # --- votre code ici ---
 
+# on aura 3 colonnes pour afficher les métriques, que l'on peut créer avec st.columns(3).
+col1, col2, col3 = st.columns(3)
+# ensuite on utilise la méthode metric de chaque colonne pour afficher les différentes métriques demandées.
+col1.metric("Occupants",       len(df_filtered))
+col2.metric("Types distincts", df_filtered["type_etablissement"].nunique())
+col3.metric("Arrondissements", df_filtered["arrondissement"].nunique())
 
 # =============================================================================
 # TODO 5 — Carte et graphique côte à côte
@@ -146,6 +192,61 @@ df_filtered = df_occ.copy()   # ← remplacer par la logique de filtrage
 # =============================================================================
 
 # --- votre code ici ---
+# si on veut appliquer une couleur différente à chaque type d'établissement, on peut définir une color_map qui associe chaque type à une couleur spécifique.
+color_map = {
+    "Commerce":          "#2196F3",
+    "Bureau":            "#FF9800",
+    "Industriel":        "#4CAF50",
+    "Agricole/pêcherie": "#9C27B0",
+}
+
+# pour créer la mise en page avec une carte à gauche et un graphique à droite, on utilise st.columns avec un ratio de 2:1.
+col_map, col_chart = st.columns([2, 1])
+
+with col_map:
+    st.subheader("Carte")
+
+    # création de la carte centrée sur Sherbrooke avec le fond "CartoDB positron"
+    m = folium.Map(
+        location=[center_lat, center_lon],
+        zoom_start=zoom,
+        tiles="CartoDB positron",
+    )
+
+    # ajout de la couche des arrondissements en fond neutre
+    folium.GeoJson(
+        gdf_arr,
+        style_function=lambda f: {
+            "fillColor": "#eeeeee",
+            "color": "#333333",
+            "weight": 1.5,
+            "fillOpacity": 0.3,
+        },
+        tooltip=folium.GeoJsonTooltip(
+            fields=["NOM"],
+            aliases=["Arrondissement :"],
+        ),
+    ).add_to(m)
+
+    # ajout d'un marqueur pour chaque occupant filtré
+    for _, row in df_filtered.iterrows():
+        fill_color = color_map.get(row["type_etablissement"], "#888888")  # BONUS 1
+
+        folium.CircleMarker(
+            location=[row["lat"], row["lng"]],
+            radius=6,
+            color="white",
+            fill=True,
+            fill_color=fill_color,
+            fill_opacity=0.7,
+            tooltip=folium.Tooltip(
+                text=f"Entreprise : {row['entreprise']}\nType : {row['type_etablissement']}"
+            )
+         ).add_to(m)
+
+    # affichage de la carte avec st_folium
+    st_folium(m, width=None, height=500, key="map")
+
 
 
 # =============================================================================
@@ -156,3 +257,45 @@ df_filtered = df_occ.copy()   # ← remplacer par la logique de filtrage
 # =============================================================================
 
 # --- votre code ici ---
+with col_chart:
+    st.subheader("Distribution par type")
+
+    # si le DataFrame filtré est vide, on affiche un message d'information. Sinon, on crée un graphique à barres horizontal qui montre la distribution des types d'établissement dans la sélection courante.
+    if df_filtered.empty:
+        st.info("Aucun occupant pour cette sélection.")
+    else:
+        # pour créer le graphique à barres, on doit d'abord compter le nombre d'occupants par type d'établissement dans df_filtered. On peut faire cela avec value_counts() et reset_index() pour obtenir un DataFrame avec les colonnes "type_etablissement" et "count". Ensuite, on utilise px.bar pour créer le graphique à barres horizontal, en spécifiant orientation="h" et les labels des axes.
+        counts = (
+            df_filtered["type_etablissement"]
+            .value_counts()
+            .reset_index()
+        )
+        counts.columns = ["Type", "Nombre"]
+
+        # enfin, on affiche le graphique avec st.plotly_chart en utilisant use_container_width=True pour qu'il s'adapte à la largeur de la colonne.
+        fig = px.bar(
+            counts,
+            x="Nombre",
+            y="Type",
+            orientation="h",
+            color="Type",
+            color_discrete_map=color_map,
+        )
+        fig.update_layout(
+            showlegend=False,
+            margin={"r": 0, "t": 0, "l": 0, "b": 0},
+            height=400,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+# =============================================================================
+# TODO 6 — Affichage du tableau des occupants filtrés
+# -----------------------------------------------------------------------------
+
+st.subheader(f"Données filtrées ({len(df_filtered)} occupants)")
+# Afficher df_filtered (sans la colonne géométrie si présente) sous la carte
+st.dataframe(
+    df_filtered[["entreprise", "type_etablissement", "arrondissement", "lat", "lng"]],
+    use_container_width=True,
+    hide_index=True,
+)

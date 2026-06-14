@@ -60,7 +60,11 @@ df_occ = pd.read_csv(vector_dir / "liste_occupants.csv")
 # Signature : folium.Map(location=[lat, lon], zoom_start=..., tiles=...)
 # =============================================================================
 
-m = None  # ← remplacer cette ligne
+#m = None  # ← remplacer cette ligne
+
+# il suffit de remplacer les None par les variables correspondantes (center_lat, center_lon, zoom)
+# une carte de base avec le fond "CartoDB positron" devrait s'afficher dans la cellule suivante
+m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom, tiles="CartoDB positron")
 
 
 # =============================================================================
@@ -81,7 +85,36 @@ m = None  # ← remplacer cette ligne
 fg_arr = folium.FeatureGroup(name="Arrondissements")
 
 # --- votre code ici ---
+# on utilise GeoJson avec un GeoDataFrame pour créer une couche de polygones. 
+# La fonction style_function permet de définir le style de chaque polygone, 
+# tandis que tooltip et popup permettent d'afficher des informations au survol ou au clic.
 
+# ne pas oublier d'ajouter la couche au FeatureGroup, puis d'ajouter le FeatureGroup à la carte pour qu'elle soit visible
+folium.GeoJson(
+    gdf_arr,
+    style_function=lambda feature: {
+        "fillColor": "#6baed6",
+        "color": "#2171b5",
+        "weight": 2,
+        "fillOpacity": 0.6,
+    },
+    highlight_function=lambda feature: {
+        "fillColor": "#fd8d3c",
+        "color": "#e6550d",
+        "weight": 3,
+        "fillOpacity": 0.8,
+    },
+    tooltip=folium.GeoJsonTooltip(
+        fields=["NOM", "NUMERO", "area_km2"],
+        aliases=["Nom :", "Numéro :", "Superficie (km²) :"],
+        localize=True,
+    ),
+    popup=folium.GeoJsonPopup(
+        fields=["NOM", "NUMERO", "area_km2"],
+        aliases=["Nom :", "Numéro :", "Superficie (km²) :"],
+        localize=True,
+    ),
+).add_to(fg_arr)
 
 fg_arr.add_to(m)
 
@@ -98,11 +131,29 @@ fg_arr.add_to(m)
 # Fonctions : folium.GeoJson, folium.GeoJsonTooltip
 # =============================================================================
 
+# on décide de masquer la couche de rues par défaut pour éviter de surcharger la carte à l'ouverture.
 fg_streets = folium.FeatureGroup(name="Réseau routier", show=False)
 
 # --- votre code ici ---
 
+# ici aussi on utilise GeoJson avec un GeoDataFrame, mais cette fois pour créer une couche de lignes. 
+# La fonction style_function définit le style des lignes, tandis que tooltip affiche les informations au survol. 
+# L'option show=False dans le FeatureGroup permet de masquer cette couche par défaut
+folium.GeoJson(
+    gdf_streets,
+    style_function=lambda feature: {
+        "color": "#31a354",
+        "weight": 2,
+        "opacity": 0.7,
+    },
+    tooltip=folium.GeoJsonTooltip(
+        fields=["TOPONYMIE", "VITESSE"],
+        aliases=["Rue :", "Vitesse (km/h) :"],
+        localize=True,
+    ),
+).add_to(fg_streets)
 
+# n'oubliez pas d'ajouter la couche au FeatureGroup, puis d'ajouter le FeatureGroup à la carte pour qu'elle soit visible
 fg_streets.add_to(m)
 
 
@@ -126,7 +177,22 @@ fg_occ = folium.FeatureGroup(name="Occupants")
 
 # --- votre code ici ---
 
+# pour les marqueurs de points, on utilise CircleMarker.
+# on doit toutefois parcourir le DataFrame ligne par ligne avec iterrows() pour créer un marqueur individuel pour chaque point,
+for _, row in df_occ.iterrows():
+    folium.CircleMarker(
+        location=[row["lat"], row["lng"]],
+        radius=5,
+        color="#3388ff",
+        fill=True,
+        fill_color="#3388ff",
+        fill_opacity=0.6,
+        tooltip=folium.Tooltip(
+            text=f"Entreprise : {row['entreprise']}\nType : {row['type_etablissement']}"
+        )
+    ).add_to(fg_occ)
 
+# n'oubliez pas d'ajouter la couche au FeatureGroup, puis d'ajouter le FeatureGroup à la carte pour qu'elle soit visible
 fg_occ.add_to(m)
 
 
@@ -142,4 +208,9 @@ fg_occ.add_to(m)
 # --- votre code ici ---
 
 output_path = output_dir / "exercice_folium.html"
+
+# le LayerControl permet à l'utilisateur d'activer ou désactiver les différentes couches de la carte.
+folium.LayerControl(collapsed=False).add_to(m)
+# la méthode save() de l'objet Map permet de sauvegarder la carte dans un fichier HTML autonome, qui peut être ouvert dans n'importe quel navigateur.
+m.save(str(output_path))
 print(f"Carte sauvegardée : {output_path}")
